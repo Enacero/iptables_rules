@@ -1,0 +1,138 @@
+#!/bin/bash
+#validation of ip
+function valid_ip {
+if [[ "$1" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]
+then
+OIFS=$IFS
+IFS='.'
+ips=($1)
+IFS=$OIFS
+if [[ ${ips[0]} -le 255 && ${ips[1]} -le 255 && ${ips[2]} -le 255 && ${ips[3]} -le 255 ]]
+then
+echo 1
+else
+echo 0
+fi
+else
+echo 0
+fi
+}
+
+# list iptables rules
+function list_rule {
+if [[ -n $1 ]]
+then
+sudo iptables -L | grep -B2 $1
+#TODO add chain type
+else
+sudo iptables -L
+fi
+}
+
+# add new rule
+function add_rule {
+echo "Specify the ip"
+read -p ">" ip
+exp=$( valid_ip $ip )
+if [[ exp -eq 1 ]]
+then
+echo "1.Output chain"
+echo "2.Input chain"
+read -p ">" chain_type
+
+case "$chain_type" in
+1)chain="OUTPUT"; key="-d" ;;
+2)chain="INPUT"; key="-s" ;;
+*)echo "Bad chain" >&2; return ;;
+esac
+
+echo "1.to Accept" >&2
+echo "2.to Reject" >&2
+echo "3.to Drop" >&2
+read -p ">" action_type
+
+case "$action_type" in
+1) action="ACCEPT" ;;
+2) action="REJECT" ;;
+3) action="DROP" ;;
+*) echo "Bad action type" >&2; return ;;
+esac
+
+read -p "Confirm [y/n] >"  confirm
+
+if [[ $confirm = 'y' ]]
+then
+sudo iptables -A $chain -p tcp $key $ip -j $action
+else
+return
+fi
+else
+echo "bad ip" >&2
+fi
+}
+
+#deliting rule
+function delete_rule {
+read -p "Enter ip >" ip
+exp=$( valid_ip $ip )
+if [[ exp -eq 1 ]]
+then
+
+list_rule $ip
+
+echo "1.Output chain"
+echo "2.Input chain"
+read -p ">" chain_type
+
+case "$chain_type" in
+1)chain="OUTPUT"; key="-d" ;;
+2)chain="INPUT"; key="-s" ;;
+*)echo "Bad chain" >&2; return ;;
+esac
+
+echo "1.to Accept" >&2
+echo "2.to Reject" >&2
+echo "3.to Drop" >&2
+read -p ">" action_type
+
+case "$action_type" in
+1) action="ACCEPT" ;;
+2) action="REJECT" ;;
+3) action="DROP" ;;
+*) echo "Bad action type" >&2; return ;;
+esac
+read -p "Confirm [y/n] >" confirm
+
+if [[ $confirm = 'y' ]]
+then
+sudo iptables -D $chain -p tcp $key $ip -j $action
+else
+return
+fi
+
+else
+echo "bad ip" >&2
+fi
+}
+
+#choosing of action
+function menu {
+echo "1.to list rules" >&2
+echo "2.to add rule" >&2
+echo "3.to delete ip" >&2
+echo "4.tp exit" >&2
+read -p ">" action
+echo $action
+}
+action=$( menu )
+while [ -n $action ]
+do
+case "$action" in
+1) ( list_rule ) ;;
+2) ( add_rule ) ;;
+3) ( delete_rule ) ;;
+4) break ;;
+*) echo "Wrong argument" ;;
+esac
+action=$( menu )
+done
